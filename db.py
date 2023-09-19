@@ -4,6 +4,8 @@ Serves as a wrapper for many of the SQLite3
 commands but any more advanced commands can
 still be executed using exec_sql method.
 
+v1.0
+
 Author: Paul Belland
 '''
 
