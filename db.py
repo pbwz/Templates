@@ -64,8 +64,7 @@ class Database:
         Input: str - table name
         Return: None'''
         # get data from table
-        res = self._cur.execute(f"SELECT * FROM {table_name}")
-        data = res.fetchall()
+        data = self.get_table_rows(table_name)
 
         # get col names
         cols = self.get_table_cols(table_name)
@@ -81,6 +80,15 @@ class Database:
             matrix.append(inner_list)
 
         self._print_visual(matrix)
+
+    def get_table_rows(self, table_name:str) -> list[tuple[str or int]]:
+        '''Returns a list of every column inside of a given table
+        
+        Input: str - table_name
+        Return: list[tuple] - all rows'''
+        res = self._cur.execute(f"SELECT * FROM {table_name}")
+        data = res.fetchall()
+        return data
 
     def _print_visual(self, data:list[list]):
         '''Prints out a visual of given table'''
