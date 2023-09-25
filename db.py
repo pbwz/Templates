@@ -36,6 +36,8 @@ class Database:
 
         Input: str - table_name
         Returns: list[str] - list of col names'''
+        self._valid_table(table_name)   # injection check
+        
         try:
             cols_str = str(tuple(table_cols))
             tab_str = f"CREATE TABLE {table_name}{cols_str}"
@@ -86,9 +88,21 @@ class Database:
         
         Input: str - table_name
         Return: list[tuple] - all rows'''
+        self._valid_table(table_name)   # injection check
+        
         res = self._cur.execute(f"SELECT * FROM {table_name}")
         data = res.fetchall()
         return data
+    
+    def _valid_table(self, table_name:str) -> None:
+        '''Checks if given table name exists, if not raises
+        exception. Protects against SQL Injection
+        
+        Input: str - table name
+        Return: None'''
+        names = self.get_table_names()
+        if table_name not in names:
+            raise Exception('That table does not exist!')
 
     def _print_visual(self, data:list[list]):
         '''Prints out a visual of given table'''
@@ -117,6 +131,8 @@ class Database:
 
         Input: str - table name
         Return: list[str] - col names'''
+        self._valid_table(table_name)   # injection check
+        
         schema = self._cur.execute(f"PRAGMA table_info({table_name})")
 
         # get names of all cols
@@ -131,6 +147,7 @@ class Database:
 
         Input: str - table name, list -  items for cols
         Return: None'''
+        self._valid_table(table_name)   # injection check
         form_values = str(tuple(values))
 
         # try to insert given values
@@ -145,16 +162,17 @@ class Database:
         
         Input: str - table_name
         Return: None'''
-        if table_name in self.get_table_names():
-            self._cur.execute(f"DROP TABLE {table_name}")
-        else:
-            raise Exception('Table does not exist')
+        self._valid_table(table_name)   # injection check
+        
+        self._cur.execute(f"DROP TABLE {table_name}")
 
     def delete(self, table_name:str, ref_name:str, ref_val:int or str) -> None:
         '''Deletes an item (row) from the database using reference
         
         Input: str - table_name, str - ref_col_name, any - ref_val
         Return: None'''
+        self._valid_table(table_name)   # injection check
+        
         exec_str = f"DELETE from {table_name} where {ref_name}={ref_val}"
         try:
             self._cur.execute(exec_str)
@@ -191,6 +209,8 @@ class Database:
         
         Input: str - table_name, str - ref_name, str/int - ref_val  
         Return: int or str - result '''
+        self._valid_table(table_name)   # injection check
+        
         exec_str = f"SELECT * FROM {table_name} WHERE {ref_name} = {ref_val}"
         
         try:
@@ -226,6 +246,8 @@ class Database:
         Input: str - table, str - ref_name, str or int - ref_val,
         str - change_name, str or int - change_value
         Return: None'''
+        self._valid_table(table)   # injection check
+        
         cmd =f"UPDATE {table} SET {c_name} = {c_val} WHERE {r_name} = {r_val}" 
         
         try:
