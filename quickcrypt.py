@@ -16,7 +16,7 @@ PASS_TYPE_MSG = 'QuickCrypt only accepts strings for passwords'
 class QuickCrypt:
     '''Class for encrypting strings'''
     
-    def __init__(self, password) -> None:
+    def __init__(self, password:str) -> None:
         # check if type is good
         if not self._verify_password(password):
             raise ValueError(PASS_TYPE_MSG)
