@@ -251,7 +251,7 @@ class Database:
         Return: int or str - result '''
         # injection checks
         self._valid_table(table_name)
-        self._valid_col(ref_name)
+        self._valid_col(table_name, ref_name)
         
         exec_str = f"SELECT * FROM {table_name} WHERE {ref_name} = ?"
         
@@ -290,8 +290,8 @@ class Database:
         Return: None'''
         # injection checks
         self._valid_table(table)
-        self._valid_col(c_name)
-        self._valid_col(r_name)
+        self._valid_col(table, c_name)
+        self._valid_col(table, r_name)
         
         cmd =f"UPDATE {table} SET {c_name} = ? WHERE {r_name} = ?" 
         
