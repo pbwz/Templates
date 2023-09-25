@@ -1,11 +1,11 @@
 '''
-A class for quick local database deployment.
-Serves as a wrapper for many of the SQLite3
-commands but any more advanced commands can
-still be executed using exec_sql method.
+A class for quick local database deployment. Serves as a wrapper 
+for many of the SQLite3 commands but any more advanced commands 
+can still be executed using exec_sql method.
 
-v1.0
-
+v1.1
+    - Added SQL injection protection for most methods
+    
 Author: Paul Belland
 '''
 
@@ -20,7 +20,11 @@ FORMAT_SEARCH = True  # formats searches into dictionaries for lookup
 
 class Database:
     '''Database class using SQLite 3 for quick project development.
-    Allows simple interaction with the API + extra features.'''
+    Allows simple interaction with the API + extra features.
+    
+    **WARNING** exec_sql and create_table are not safe from SQL injection.
+    Please do no let users use create_table and if use safe_exec_sql for
+    any queries where there is a risk of SQL injection.'''
 
     def __init__(self, db_name:str) -> None:
         # create/connect to db
@@ -36,14 +40,12 @@ class Database:
 
         Input: str - table_name
         Returns: list[str] - list of col names'''
-        self._valid_table(table_name)   # injection check
-        
         try:
-            cols_str = str(tuple(table_cols))
-            tab_str = f"CREATE TABLE {table_name}{cols_str}"
+            cols_str = ','.join(table_cols)
+            tab_str = f"CREATE TABLE {table_name}({cols_str})"
             self._cur.execute(tab_str)
         except sqlite3.OperationalError as error:
-            raise Exception('Error: Table already exists') from error
+            raise Exception('Table already exists')
 
     def get_table_names(self) -> list[str]:
         '''Returns names of all existing tables in DB
@@ -103,6 +105,16 @@ class Database:
         names = self.get_table_names()
         if table_name not in names:
             raise Exception('That table does not exist!')
+        
+    def _valid_col(self, table_name:str, col_name:str) -> None:
+        '''Checks if a given column name exists, if not raises
+        exception. Protects against SQL Injection
+        
+        Input: str - table name, str - column name
+        Return: None'''
+        cols = self.get_table_cols(table_name)
+        if col_name not in cols:
+            raise Exception('That column does not exist!')
 
     def _print_visual(self, data:list[list]):
         '''Prints out a visual of given table'''
@@ -148,11 +160,15 @@ class Database:
         Input: str - table name, list -  items for cols
         Return: None'''
         self._valid_table(table_name)   # injection check
-        form_values = str(tuple(values))
-
+        
+        # account for different lengths
+        form_values = tuple(values)
+        q_vals = '?,' * len(values)
+        q_vals = q_vals[:-1]  # remove trailing comma
+        
         # try to insert given values
         try:
-            self._cur.execute(f"INSERT INTO {table_name} values{form_values}")
+            self._cur.execute(f"INSERT INTO {table_name} values ({q_vals})",form_values)
             self._con.commit()
         except sqlite3.OperationalError as error:
             raise error
@@ -171,16 +187,18 @@ class Database:
         
         Input: str - table_name, str - ref_col_name, any - ref_val
         Return: None'''
-        self._valid_table(table_name)   # injection check
+        # injection checks
+        self._valid_table(table_name)
+        self._valid_col(table_name, ref_name)
         
-        exec_str = f"DELETE from {table_name} where {ref_name}={ref_val}"
+        exec_str = f"DELETE FROM {table_name} WHERE {ref_name}=?"
         try:
-            self._cur.execute(exec_str)
+            self._cur.execute(exec_str, (ref_val,))
             self._con.commit()
         except sqlite3.OperationalError as error:
             raise error
 
-    def exec_sql(self, command:str, commit:bool = False) -> sqlite3.Cursor:
+    def exec_sql(self,command:str,commit:bool = False) -> sqlite3.Cursor:
         '''Allows execution of more advanced SQL queries.
         If a commit is needed, add True as an arg after command.
         
@@ -188,6 +206,28 @@ class Database:
         Return: sqlite3.Cursor'''
         try:
             response = self._cur.execute(command)
+            
+            # commits if needed
+            if commit:
+                self._con.commit()
+            
+            return response
+        except sqlite3.OperationalError as error:
+            raise error
+        
+    def safe_exec_sql(self,command:str,params:list,commit:bool = False) -> sqlite3.Cursor:
+        '''Allows execution of more advanced SQL queries.
+        If a commit is needed, add True as an arg after command.
+        
+        Safely tries to execute query. Use ? as placeholders in
+        command then pass their values in a list under params.
+        Protects against SQL Injection
+        
+        Input: str - command, list - params, bool - commit
+        Return: sqlite3.Cursor'''
+        try:
+            params = tuple(params)
+            response = self._cur.execute(command,params)
             
             # commits if needed
             if commit:
@@ -209,12 +249,14 @@ class Database:
         
         Input: str - table_name, str - ref_name, str/int - ref_val  
         Return: int or str - result '''
-        self._valid_table(table_name)   # injection check
+        # injection checks
+        self._valid_table(table_name)
+        self._valid_col(ref_name)
         
-        exec_str = f"SELECT * FROM {table_name} WHERE {ref_name} = {ref_val}"
+        exec_str = f"SELECT * FROM {table_name} WHERE {ref_name} = ?"
         
         try:
-            res = self._cur.execute(exec_str)
+            res = self._cur.execute(exec_str,(ref_val,))
             results = list(res.fetchall())
             
             # format if setting on
@@ -246,12 +288,15 @@ class Database:
         Input: str - table, str - ref_name, str or int - ref_val,
         str - change_name, str or int - change_value
         Return: None'''
-        self._valid_table(table)   # injection check
+        # injection checks
+        self._valid_table(table)
+        self._valid_col(c_name)
+        self._valid_col(r_name)
         
-        cmd =f"UPDATE {table} SET {c_name} = {c_val} WHERE {r_name} = {r_val}" 
+        cmd =f"UPDATE {table} SET {c_name} = ? WHERE {r_name} = ?" 
         
         try:
-            self._cur.execute(cmd)
+            self._cur.execute(cmd, (c_val,r_val))
             self._con.commit()
         except sqlite3.OperationalError as error:
             raise Exception('Failed to update cell')
