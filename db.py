@@ -96,6 +96,26 @@ class Database:
         data = res.fetchall()
         return data
     
+    def get_table_col(self, table_name:str, col_name:str) -> list[str or int]:
+        '''Searches a given table and returns all values in
+        the requested column.
+        
+        Input: str - table name, str - column name
+        Return: list - column items'''
+        # injection checks
+        self._valid_table(table_name)
+        self._valid_col(table_name, col_name)
+        
+        res = self._cur.execute(f"SELECT {col_name} FROM {table_name}")
+        data = res.fetchall()
+        
+        # remove unnecessary tuples
+        cleaned_data = []
+        for item in data:
+            cleaned_data.append(item[0])
+            
+        return cleaned_data
+        
     def _valid_table(self, table_name:str) -> None:
         '''Checks if given table name exists, if not raises
         exception. Protects against SQL Injection
